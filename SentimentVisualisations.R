@@ -6,6 +6,7 @@ library(tm)
 install.packages("stopwords")
 library(stopwords)
 
+#build custom stop words which includes spanish, portuguese, japanese and mandarin 
 custom_stop_words <- bind_rows(stop_words,
                                data_frame(word = stopwords("portuguese"),
                                           lexicon = "custom"),
@@ -16,7 +17,7 @@ custom_stop_words <- bind_rows(stop_words,
                                data_frame(word = stopwords("ja", source = "marimo"),
                                           lexicon = "custom"))
 
-#Exploratory analysis of common track words etc
+#tokenise the words from track names 
 track_words <- spotify %>%
   unnest_tokens(word, track_name) %>% 
   anti_join(custom_stop_words)
@@ -31,6 +32,7 @@ words_by_genre <- track_words %>%
   count(track_genre, word, sort = TRUE) %>%
   ungroup()
 words_by_genre
+
 ################################################################################
 ## Get sentiment Score for each track title ####################################
 ################################################################################
@@ -44,13 +46,14 @@ track_sentiments <- spotify %>%
     sentiment_score = mean(value, na.rm = TRUE),  # Calculate mean sentiment per track
   ) 
 
-# Merge with original dataset
+# Merge sentiment scores with original dataset
 tracks <- spotify %>%
   left_join(track_sentiments, by = "track_id") %>%
   mutate(across(sentiment_score, ~ replace(., is.na(.), 0))) %>%
   distinct()
 View(tracks)
 
+#aggregate data - mean values for visualisation
 aggregated_data <- tracks %>%
   group_by(track_genre) %>%
   summarise(
@@ -60,11 +63,12 @@ aggregated_data <- tracks %>%
   )
 View(aggregated_data)
 
-##########################
-
+#################################################################################
+#select acoustic variables for PCA
 pca_data<- tracks %>%
   select(track_genre, popularity, valence, energy, danceability, acousticness, sentiment_score)
 
+#aggregate the variables so mean score for each genre is established
 pca_aggregated_data <- pca_data %>%
   group_by(track_genre) %>%
   summarise(
@@ -76,7 +80,7 @@ pca_aggregated_data <- pca_data %>%
     mean_sentiment = mean(sentiment_score)
   )
 
-pca<-prcomp(pca_aggregated_data[,3:7], scale=TRUE) #tell the function to scale all variables
+pca<-prcomp(pca_aggregated_data[,3:7], scale=TRUE) #scale all variables
 pca_aggregated_data.pca.scaled<-data.frame(
   genre=pca_aggregated_data$track_genre,
   popularity=pca_aggregated_data$mean_popularity,
@@ -84,19 +88,20 @@ pca_aggregated_data.pca.scaled<-data.frame(
   PC2=pca$x[,2]
 )
 
+#find top 50 popular genres
 top_genres <- tracks %>%
   group_by(track_genre) %>%
   summarise(mean_popularity = mean(popularity)) %>%
   arrange(desc(mean_popularity)) %>%
   head(50)
 
+#filter pca to only include top 50 most popular genres to not clutter visualisation
 top_pca_scores <- pca_aggregated_data.pca.scaled %>%
   filter(genre %in% top_genres$track_genre)
 
+#plot PCA 
 p4<-ggplot(top_pca_scores, aes(x = PC1, y = PC2, label = genre)) +
-  #geom_point(aes(color = popularity), size = 3, alpha = 0.7) +    # Make points slightly transparent
   geom_text(size = 4, color = "black") +          # Labels outside the points
-  #geom_text(size = 4) +
   labs(
     title = "PCA of Spotify Tracks",
     subtitle = "PCA of Spotify tracks using valence, track title sentiment, energy, danceability and acousticness\ncategorised by mean popularity score",
@@ -116,21 +121,30 @@ p4<-ggplot(top_pca_scores, aes(x = PC1, y = PC2, label = genre)) +
     axis.title = element_text(size = 10)         # Axis title size
   )
 
-########################
+#########################################################################################
+## Scatter plot - Valence vs Sentiment of Genres with Popularity ########################
+#########################################################################################
+
+#normalisation function
+normalise <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+#normalise the variables
 aggregated_data$mean_valence_normalised <- normalise(aggregated_data$mean_valence)
 aggregated_data$mean_sentiment_normalised <- normalise(aggregated_data$mean_sentiment)
 
+#plot scatter
 p1<-ggplot(aggregated_data, aes(x = mean_valence_normalised, y = mean_sentiment_normalised, label = track_genre)) +
-  geom_point(aes(color = mean_popularity), size = 3, alpha = 0.7) +    # Make points slightly transparent
+  geom_point(aes(color = mean_popularity), size = 3, alpha = 0.7) +    # Set popularity as colour of points 
   geom_text(vjust = -1, size = 3, color = "black") +          # Labels outside the points
-  #geom_text(size = 4) +
   labs(
     title = "Mean Valence vs Mean Sentiment by Genre",
     subtitle = "Top 30 genres",
     x = "Valence",
     y = "Sentiment Score"
   ) +
-  scale_color_gradient(low = "blue", high = "orange") +
+  scale_color_gradient(low = "blue", high = "orange") +  #set gradient colour scale
   theme_minimal() +
   theme(
     panel.grid.major = element_blank(),          # Remove major grid lines
@@ -138,7 +152,7 @@ p1<-ggplot(aggregated_data, aes(x = mean_valence_normalised, y = mean_sentiment_
     legend.title = element_text(size = 12),     # Adjust legend title font size
     legend.text = element_text(size = 10),
     legend.position = "bottom",
-    plot.title = element_text(size = 16, face = "bold"),  # Title customization
+    plot.title = element_text(size = 16, face = "bold"),  # Title customisation
     plot.subtitle = element_text(size = 12),
     axis.title = element_text(size = 10)         # Axis title size
   )
@@ -148,130 +162,37 @@ p1<-ggplot(aggregated_data, aes(x = mean_valence_normalised, y = mean_sentiment_
 ################################################################################
 install.packages("wordcloud2")
 library(wordcloud2)
-library(ggwordcloud())
-library(tidytext)
+library(ggwordcloud)
 
 #sort words by occurance
 word_count <- count(track_words, word) %>% 
   arrange(desc(count=n))
-
 head(word_count, 20)
+
 #wordcloud for all words
 wordcloud2(word_count, size=1.6, color='random-dark')
-
 
 ################################################################################
 
 # Join with Bing lexicon to get sentiment labels (positive/negative)
 sentiment_words <- track_words %>%
   inner_join(get_sentiments("bing"), by = "word") %>%
-  count(word, sentiment, sort = TRUE) %>%
-  #mutate(n = log1p(n)) %>%  # log1p(x) is log(x + 1), handles small values
+  count(word, sentiment, sort = TRUE) %>%+
   head(200) #get top 200 words to limit chart size 
 
 sentiment_words <- sentiment_words[-1, ] #remove top entry 'feat' as skews graph
 
+#plot wordcloud
 p2<-ggplot(sentiment_words, aes(label = word, size = n, colour = sentiment)) +
   geom_text_wordcloud_area() +      # Use area-based sizing for better aesthetics
   scale_size_area(max_size = 60) + # Adjust word size
-  scale_color_manual(values = c("positive" = "red3", "negative" = "blue3")) + 
-  theme_minimal() +
-  #coord_fixed(ratio = 1) + 
+  scale_color_manual(values = c("positive" = "red3", "negative" = "blue3")) + # set colours
+  theme_minimal() + 
   labs(title = "Comparison Cloud: Positive vs. Negative Sentiment",
        colour = "Sentiment",    # Legend title for color
        size = "Frequency"      # Legend title for size
   ) +
   theme(legend.position = "right")
-
-################################################################################
-## Heatmap - Correlations between track features############# ##################
-################################################################################
-library(reshape2)
-
-#normalisation function
-normalise <- function(x) {
-  (x - min(x)) / (max(x) - min(x))
-}
-
-reduced_data <- subset(spotify, select= c(popularity, explicit, danceability, energy, loudness, speechiness,
-                                         acousticness, instrumentalness, liveness, valence, tempo, time_signature, mean_sentiment))
-#normalise data
-reduced_data <- lapply(reduced_data, normalise) %>% as.data.frame()
-
-# Correlation matrix
-cor_matrix <- cor(reduced_data)
-
-# Convert to long format for ggplot
-cor_matrix_melted <- melt(cor_matrix)
-
-# Plot heatmap
-ggplot(cor_matrix_melted, aes(Var1, Var2, fill = value)) +
-  geom_tile() +
-  scale_fill_gradient2(midpoint = 0, low = "red", high = "blue") +
-  labs(title = "Correlations Between Song Features") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab(NULL) + 
-  ylab(NULL)
-
-#################################################################################
-## Network Map - Valence correlation in popular genres ######################################
-#################################################################################
-
-# Install necessary libraries
-install.packages(c("igraph", "ggraph", "tidygraph", "RColorBrewer"))
-library(igraph)
-library(ggraph)
-library(tidygraph)
-library(RColorBrewer)
-
-#avg popularity by genre
-popular_genres <- tracks %>%
-  #select(track_name, artists, track_genre, popularity) %>%
-  group_by(track_genre) %>%
-  summarise_at(vars(popularity), list(avg_popularity = mean)) %>%
-  arrange(desc(avg_popularity)) %>%
-  head(15)
-
-top_genre_tracks <- tracks %>%
-  #select(track_name, track_genre) %>%
-  filter(track_genre %in% popular_genres$track_genre) %>%
-  #select(track_name, popularity, valence, track_genre) %>%
-  distinct()
-
-top_track_words <- top_genre_tracks %>%
-  unnest_tokens(word, track_name) %>% 
-  anti_join(custom_stop_words)
-count(track_words)
-
-#occurances of words by genre
-words_by_top_genre <- top_track_words %>%
-  count(track_genre, word, sort = TRUE) %>%
-  ungroup()
-words_by_top_genre
-
-#Calculate correlations between artists
-track_genre_cors <- words_by_top_genre %>%
-  pairwise_cor(track_genre, word, n, sort = TRUE)
-track_genre_cors
-
-track_genre_cors %>%
-  filter(correlation > 0.2) %>% #display correlations greater than .65
-  graph_from_data_frame() %>%
-  ggraph(layout = "fr") +
-  geom_edge_link(aes(alpha = correlation, 
-                     width = correlation), 
-                 color = "aquamarine3") +
-  scale_edge_width(range = c(0.5, 1.2)) +
-  geom_node_point(size = 3, 
-                  color = "aquamarine3") +
-  geom_node_text(aes(label = name), repel = TRUE) +
-  theme_void() +
-  scale_fill_manual() +
-  theme_graph(base_family = "Helvetica", base_size = 12) +
-  theme(legend.position = "bottom") +
-  labs(title = "Correlating Music Genres",
-       subtitle ="By Common Words in Track Names")
 
 #################################################################################
 ## Heatmap: Audio Features Accross Genres #######################################
@@ -303,9 +224,10 @@ p3 <- ggplot(audio_features_long, aes(x = variable, y = track_genre, fill = valu
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #################################################################################
-
+# combine plots into composite
 install.packages("cowplot")
 library(cowplot)
+
 combined_plot <- plot_grid(p1, p2, p3, p4, ncol = 2)
 
 # Print the combined plot
