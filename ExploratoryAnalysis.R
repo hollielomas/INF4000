@@ -100,3 +100,62 @@ popular_artists<- spotify_new %>%
   head(20)
 
 popular_artists
+
+#################################################################################
+## Network Map - Valence correlation in popular genres ######################################
+#################################################################################
+
+# Install necessary libraries
+install.packages(c("igraph", "ggraph", "tidygraph", "RColorBrewer"))
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(RColorBrewer)
+
+#avg popularity by genre
+popular_genres <- tracks %>%
+  #select(track_name, artists, track_genre, popularity) %>%
+  group_by(track_genre) %>%
+  summarise_at(vars(popularity), list(avg_popularity = mean)) %>%
+  arrange(desc(avg_popularity)) %>%
+  head(15)
+
+top_genre_tracks <- tracks %>%
+  #select(track_name, track_genre) %>%
+  filter(track_genre %in% popular_genres$track_genre) %>%
+  #select(track_name, popularity, valence, track_genre) %>%
+  distinct()
+
+top_track_words <- top_genre_tracks %>%
+  unnest_tokens(word, track_name) %>% 
+  anti_join(custom_stop_words)
+count(track_words)
+
+#occurances of words by genre
+words_by_top_genre <- top_track_words %>%
+  count(track_genre, word, sort = TRUE) %>%
+  ungroup()
+words_by_top_genre
+
+#Calculate correlations between artists
+track_genre_cors <- words_by_top_genre %>%
+  pairwise_cor(track_genre, word, n, sort = TRUE)
+track_genre_cors
+
+track_genre_cors %>%
+  filter(correlation > 0.2) %>% #display correlations greater than .65
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(alpha = correlation, 
+                     width = correlation), 
+                 color = "aquamarine3") +
+  scale_edge_width(range = c(0.5, 1.2)) +
+  geom_node_point(size = 3, 
+                  color = "aquamarine3") +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void() +
+  scale_fill_manual() +
+  theme_graph(base_family = "Helvetica", base_size = 12) +
+  theme(legend.position = "bottom") +
+  labs(title = "Correlating Music Genres",
+       subtitle ="By Common Words in Track Names")
