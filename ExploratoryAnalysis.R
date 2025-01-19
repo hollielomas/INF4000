@@ -2,6 +2,7 @@ library(dplyr)
 library(tidyr)
 library(tidyverse)
 
+#read in Spotify dataset
 spotify<-read.csv("dataset.csv", header=TRUE)
 View(spotify)
 
@@ -23,6 +24,7 @@ select(spotify, track_genre) %>% n_distinct()
 #count number of track's per genre
 count(spotify, track_genre)
 
+#get longest (duration) songs
 longest<- spotify %>%
   arrange(desc(duration_ms)) %>%
   select(artists, track_name, duration_ms, popularity, track_genre) %>% distinct()
@@ -31,15 +33,15 @@ longest<- spotify %>%
 head(longest, 20)
 tail(longest, 20)
 
-#popularity vs length
+#plot popularity vs song length
 ggplot(longest, aes(x=duration_ms, y=popularity)) +
   geom_line()
 
-#energy vs popularity
+#plot energy vs popularity
 ggplot(spotify, aes(x=energy, y=popularity)) +
   geom_point(size=0.5)
 
-#tempo
+#investigate high and low tempo tracks
 tempo <- spotify %>%
   arrange(desc(energy)) %>%
   select(artists, track_genre, energy, tempo) %>%
@@ -48,18 +50,18 @@ tempo <- spotify %>%
 head(tempo, 20)  
 tail(tempo, 20)
 
-#popularity vs energy by genre for top 100 most popular tracks
+#plot popularity vs energy by genre for top 100 most popular tracks
 ggplot(head(new_df, 100), aes(x=energy, y=popularity, colour=track_genre)) +
   geom_point()
 
-#popularity vs valence by genre for top 500 most popular tracks
+#plot popularity vs valence by genre for top 500 most popular tracks
 ggplot(head(new_df, 500), aes(x=valence, y=popularity, colour=track_genre)) +
   geom_point()
 
 #count number of tracks per artist, arrange from most to least
 head(count(spotify_new, artists) %>% arrange(desc(count=n)), 20)
 
-#get tracks with highest valence scores
+#get tracks with highest valence (happy/sad) scores
 vibe<- spotify %>%
   arrange(desc(valence)) %>%
   select(artists, popularity, track_genre) %>% distinct()
@@ -67,7 +69,7 @@ vibe<- spotify %>%
 head(vibe, 20)
 tail(vibe, 20)
 
-#number of different artists
+#number of different artists in the data
 count(spotify_new, artists) %>% n_distinct()
 
 #top 20 most frequent artists
