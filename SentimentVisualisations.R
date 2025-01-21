@@ -107,19 +107,16 @@ top_pca_scores <- pca_aggregated_data.pca.scaled %>%
 p4<-ggplot(top_pca_scores, aes(x = PC1, y = PC2, label = genre)) +
   geom_text(size = 4, color = "black") +          # Labels outside the points
   labs(
-    title = "PCA of Spotify Tracks",
-    subtitle = "PCA of Spotify tracks using valence, track title sentiment, energy, danceability and acousticness\ncategorised by mean popularity score",
+    title = "Unpacking Genres: How Emotions and Audio Features Intersect",
+    subtitle = "Features included: Valence, Track Name Sentiment, Energy, Danceability and Acousticness (mean)",
     x = "PCA 1",
-    y = "PCA 2"
+    y = "PCA 2",
+    caption="Clustered music genres, Spotify"
   ) +
-  #scale_color_gradient(low = "blue", high = "orange") +
   theme_minimal() +
   theme(
     panel.grid.major = element_blank(),          # Remove major grid lines
     panel.grid.minor = element_blank(),          # Remove minor grid lines
-    #legend.title = element_text(size = 12),     # Adjust legend title font size
-    #legend.text = element_text(size = 10),
-    #legend.position = "bottom",
     plot.title = element_text(size = 16, face = "bold"),  # Title customization
     plot.subtitle = element_text(size = 12),
     axis.title = element_text(size = 10)         # Axis title size
@@ -140,15 +137,16 @@ aggregated_data$mean_sentiment_normalised <- normalise(aggregated_data$mean_sent
 
 #plot scatter
 p1<-ggplot(aggregated_data, aes(x = mean_valence_normalised, y = mean_sentiment_normalised, label = track_genre)) +
-  geom_point(aes(color = mean_popularity), size = 3, alpha = 0.7) +    # Set popularity as colour of points 
+  geom_point(aes(color = mean_popularity), size = 3, alpha = 0.7) +    # Make points slightly transparent
   geom_text(vjust = -1, size = 3, color = "black") +          # Labels outside the points
   labs(
-    title = "Mean Valence vs Mean Sentiment by Genre",
-    subtitle = "Top 30 genres",
+    title = "How Emotions Define Genres: Sentiment and Valence in Spotify",
+    subtitle = "Mean Valence vs Mean Sentiment by Genre",
     x = "Valence",
-    y = "Sentiment Score"
+    y = "Sentiment Score",
+    caption="Mean Valence vs Mean Sentiment by Genre, Spotify"
   ) +
-  scale_color_gradient(low = "blue", high = "orange") +  #set gradient colour scale
+  scale_color_gradient(low = "blue", high = "orange") +
   theme_minimal() +
   theme(
     panel.grid.major = element_blank(),          # Remove major grid lines
@@ -156,7 +154,7 @@ p1<-ggplot(aggregated_data, aes(x = mean_valence_normalised, y = mean_sentiment_
     legend.title = element_text(size = 12),     # Adjust legend title font size
     legend.text = element_text(size = 10),
     legend.position = "bottom",
-    plot.title = element_text(size = 16, face = "bold"),  # Title customisation
+    plot.title = element_text(size = 16, face = "bold"),  # Title customization
     plot.subtitle = element_text(size = 12),
     axis.title = element_text(size = 10)         # Axis title size
   )
@@ -188,15 +186,17 @@ sentiment_words <- sentiment_words[-1, ] #remove top entry 'feat' as skews graph
 
 #plot wordcloud
 p2<-ggplot(sentiment_words, aes(label = word, size = n, colour = sentiment)) +
-  geom_text_wordcloud_area() +      # Use area-based sizing for better aesthetics
-  scale_size_area(max_size = 60) + # Adjust word size
-  scale_color_manual(values = c("positive" = "red3", "negative" = "blue3")) + # set colours
+  geom_text_wordcloud_area(show.legend = TRUE) +      # Use area-based sizing for better aesthetics
+  scale_size_area(max_size = 60, guide = "none") + # Adjust word size
+  scale_color_manual(values = c("positive" = "blue3", "negative" = "red3")) + 
   theme_minimal() + 
-  labs(title = "Comparison Cloud: Positive vs. Negative Sentiment",
+  labs(title = "Words that Shape Music: Sentiment in Song Titles Across Genres",
        colour = "Sentiment",    # Legend title for color
-       size = "Frequency"      # Legend title for size
   ) +
-  theme(legend.position = "right")
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 16, face = "bold"),  # Title customization
+        plot.subtitle = element_text(size = 12),
+        axis.title = element_text(size = 10))        # Axis title size
 
 #################################################################################
 ## Heatmap: Audio Features Accross Genres #######################################
@@ -223,9 +223,13 @@ p3 <- ggplot(audio_features_long, aes(x = variable, y = track_genre, fill = valu
   geom_tile() +
   scale_fill_gradient2(midpoint = 0.5, low = "red", high = "blue") +
   theme_minimal() +
-  labs(title = "Heatmap of Audio Features Across 15 Most Popular Genres",
-       x = "Audio Features", y = "Genres") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(title = "The Sound of Emotion: Musical Traits Across Genres",
+       x = "Audio Features", y = "Genres",
+       caption="Audio Features Across the 15 Most Popular Genres, Spotify") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 16, face = "bold"),  # Title customization
+        plot.subtitle = element_text(size = 12),
+        axis.title = element_text(size = 10))
 
 #################################################################################
 # combine plots into composite
